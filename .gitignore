@@ -1,6 +1,6 @@
 # Binaries
 bin/
-hookman
+/hookman
 *.exe
 *.exe~
 *.dll

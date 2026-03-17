@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hookman
+      POSTGRES_PASSWORD: hookman_secret
+      POSTGRES_DB: hookman
+    ports:
+      - "5432:5432"
+    volumes:
+      - hookman_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hookman"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  hookman:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hookman:hookman_secret@postgres:5432/hookman?sslmode=disable
+      API_KEY: dev-api-key
+      SIGNING_SECRET: dev-signing-secret
+      PORT: "4000"
+      LOG_LEVEL: debug
+    ports:
+      - "4000:4000"
+    command: ["./hookman", "serve"]
+
+volumes:
+  hookman_pgdata:

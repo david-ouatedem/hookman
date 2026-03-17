@@ -1,0 +1,40 @@
+# Binaries
+bin/
+hookman
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go
+vendor/
+*.test
+*.out
+cover.out
+coverage.html
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dashboard build
+dashboard/node_modules/
+
+# Docker
+tmp/
+
+# Air hot reload
+tmp/
+
+# Spec / docs that shouldn't be tracked
+README-hookman.md

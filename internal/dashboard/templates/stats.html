@@ -1,0 +1,38 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+<div class="grid">
+  <article class="stat-card">
+    <small>Pending</small>
+    <h2>{{index . "pending"}}</h2>
+  </article>
+  <article class="stat-card">
+    <small>Processing</small>
+    <h2>{{index . "processing"}}</h2>
+  </article>
+  <article class="stat-card">
+    <small>Delivered</small>
+    <h2>{{index . "delivered"}}</h2>
+  </article>
+  <article class="stat-card">
+    <small>Dead</small>
+    <h2>{{index . "dead"}}</h2>
+  </article>
+</div>
+<article class="stat-card">
+  <small>Total Events</small>
+  <h2>{{index . "total"}}</h2>
+</article>
+
+{{if gt (index . "dead") 0}}
+<div style="margin-top: 1rem;">
+  <button hx-post="/dashboard/events/dead/replay"
+          hx-target="#toast-container"
+          hx-swap="innerHTML"
+          class="secondary">
+    Replay All Dead Events
+  </button>
+</div>
+{{end}}
+{{end}}
+
+{{template "layout" .}}

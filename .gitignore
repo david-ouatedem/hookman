@@ -27,9 +27,6 @@ coverage.html
 *~
 .DS_Store
 
-# Dashboard build
-dashboard/node_modules/
-
 # Docker
 tmp/
 

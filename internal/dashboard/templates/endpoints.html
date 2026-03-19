@@ -1,0 +1,76 @@
+{{define "content"}}
+<h1>Endpoints</h1>
+
+<details>
+  <summary role="button" class="outline">Create New Endpoint</summary>
+  <form hx-post="/dashboard/endpoints"
+        hx-target="#endpoint-table-body"
+        hx-swap="innerHTML"
+        style="margin-top: 1rem;">
+    <label>
+      URL
+      <input type="url" name="url" placeholder="https://example.com/webhooks" required>
+    </label>
+    <label>
+      Topics (comma-separated)
+      <input type="text" name="topics" placeholder="payment.completed, order.created" required>
+    </label>
+    <label>
+      Description (optional)
+      <input type="text" name="description" placeholder="Production webhook endpoint">
+    </label>
+    <button type="submit">Create Endpoint</button>
+  </form>
+</details>
+
+<table role="grid">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>URL</th>
+      <th>Topics</th>
+      <th>Enabled</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="endpoint-table-body">
+    {{template "endpoint_rows_inner" .}}
+  </tbody>
+</table>
+{{end}}
+
+{{define "endpoint_rows_inner"}}
+{{range .Endpoints}}
+<tr>
+  <td class="mono" style="font-size: 0.8em;">{{.ID}}</td>
+  <td><a href="{{.Url}}" target="_blank" rel="noopener">{{.Url}}</a></td>
+  <td>{{joinTopics .Topics}}</td>
+  <td>
+    <button hx-post="/dashboard/endpoints/{{.ID}}/toggle"
+            hx-target="#endpoint-table-body"
+            hx-swap="innerHTML"
+            class="outline {{if .Enabled}}contrast{{else}}secondary{{end}}"
+            style="padding: 0.15rem 0.5rem; font-size: 0.8em;">
+      {{if .Enabled}}Enabled{{else}}Disabled{{end}}
+    </button>
+  </td>
+  <td>{{formatTime .CreatedAt}}</td>
+  <td class="actions">
+    <a href="/dashboard/events?topic=" style="font-size: 0.85em;">Deliveries</a>
+    <button hx-delete="/dashboard/endpoints/{{.ID}}"
+            hx-target="#endpoint-table-body"
+            hx-swap="innerHTML"
+            hx-confirm="Delete this endpoint?"
+            class="outline secondary"
+            style="padding: 0.15rem 0.5rem; font-size: 0.8em; margin-left: 0.25rem;">
+      Delete
+    </button>
+  </td>
+</tr>
+{{else}}
+<tr><td colspan="6" style="text-align:center; color: var(--pico-muted-color);">No endpoints configured</td></tr>
+{{end}}
+{{end}}
+
+{{template "layout" .}}

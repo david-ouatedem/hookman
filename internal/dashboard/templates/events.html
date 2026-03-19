@@ -1,0 +1,60 @@
+{{define "content"}}
+<h1>Events</h1>
+
+<form class="filter-form"
+      hx-get="/dashboard/partials/events"
+      hx-target="#event-table-body"
+      hx-swap="innerHTML">
+  <input type="text" name="topic" placeholder="Filter by topic" value="{{.Topic}}">
+  <select name="status">
+    <option value="">All statuses</option>
+    <option value="pending" {{if eq .Status "pending"}}selected{{end}}>Pending</option>
+    <option value="processing" {{if eq .Status "processing"}}selected{{end}}>Processing</option>
+    <option value="delivered" {{if eq .Status "delivered"}}selected{{end}}>Delivered</option>
+    <option value="failed" {{if eq .Status "failed"}}selected{{end}}>Failed</option>
+    <option value="dead" {{if eq .Status "dead"}}selected{{end}}>Dead</option>
+  </select>
+  <button type="submit">Filter</button>
+</form>
+
+<table role="grid">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Topic</th>
+      <th>Status</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="event-table-body">
+    {{template "event_rows_inner" .}}
+  </tbody>
+</table>
+{{end}}
+
+{{define "event_rows_inner"}}
+{{range .Events}}
+<tr>
+  <td class="mono"><a href="/dashboard/events/{{.ID}}">{{.ID}}</a></td>
+  <td>{{.Topic}}</td>
+  <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
+  <td>{{formatTime .CreatedAt}}</td>
+  <td class="actions">
+    {{if or (eq .Status "dead") (eq .Status "failed") (eq .Status "delivered")}}
+    <button hx-post="/dashboard/events/{{.ID}}/replay"
+            hx-target="#toast-container"
+            hx-swap="innerHTML"
+            class="outline secondary"
+            style="padding: 0.25rem 0.5rem; font-size: 0.8em;">
+      Replay
+    </button>
+    {{end}}
+  </td>
+</tr>
+{{else}}
+<tr><td colspan="5" style="text-align:center; color: var(--pico-muted-color);">No events found</td></tr>
+{{end}}
+{{end}}
+
+{{template "layout" .}}

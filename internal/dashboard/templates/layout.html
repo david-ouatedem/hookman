@@ -1,0 +1,48 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hookman Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root { --pico-font-size: 15px; }
+    nav { margin-bottom: 1rem; }
+    .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; }
+    .status-success { background: #d4edda; color: #155724; }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-failed { background: #f8d7da; color: #721c24; }
+    .status-dead { background: #d6d8db; color: #383d41; }
+    .stat-card { text-align: center; padding: 1rem; }
+    .stat-card h2 { margin: 0; font-size: 2.5rem; }
+    .stat-card small { color: var(--pico-muted-color); }
+    .payload-pre { max-height: 300px; overflow: auto; font-size: 0.85em; }
+    .toast { position: fixed; top: 1rem; right: 1rem; z-index: 1000; padding: 0.75rem 1.5rem; border-radius: 6px; animation: fadeout 3s forwards; }
+    .toast-success { background: #d4edda; color: #155724; }
+    .toast-error { background: #f8d7da; color: #721c24; }
+    @keyframes fadeout { 0%,70% { opacity: 1; } 100% { opacity: 0; display: none; } }
+    table { font-size: 0.9em; }
+    .mono { font-family: monospace; font-size: 0.85em; }
+    .actions { white-space: nowrap; }
+    .filter-form { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 1rem; }
+    .filter-form input, .filter-form select { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <nav class="container">
+    <ul>
+      <li><strong>Hookman</strong></li>
+    </ul>
+    <ul>
+      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/dashboard/events">Events</a></li>
+      <li><a href="/dashboard/endpoints">Endpoints</a></li>
+    </ul>
+  </nav>
+  <main class="container">
+    <div id="toast-container"></div>
+    {{template "content" .}}
+  </main>
+</body>
+</html>{{end}}

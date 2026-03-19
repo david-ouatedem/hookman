@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/david-ouatedem/hookman/internal/config"
+	"github.com/david-ouatedem/hookman/internal/dashboard"
 	"github.com/david-ouatedem/hookman/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -48,6 +49,12 @@ func (s *Server) buildRouter() chi.Router {
 	// Prometheus metrics (no auth, conditionally enabled)
 	if s.cfg.MetricsEnabled {
 		r.Handle("/metrics", promhttp.Handler())
+	}
+
+	// Dashboard (no auth, conditionally enabled)
+	if s.cfg.DashboardEnabled {
+		dash := dashboard.NewDashboard(s.store)
+		dash.RegisterRoutes(r)
 	}
 
 	// API routes (auth required)

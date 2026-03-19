@@ -1,0 +1,68 @@
+{{define "content"}}
+<h1>Event Detail</h1>
+
+<article>
+  <header>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="mono">{{.Event.ID}}</span>
+      <span class="status-badge {{statusClass .Event.Status}}" id="event-status">{{.Event.Status}}</span>
+    </div>
+  </header>
+
+  <table>
+    <tr><td><strong>Topic</strong></td><td>{{.Event.Topic}}</td></tr>
+    <tr><td><strong>Status</strong></td><td>{{.Event.Status}}</td></tr>
+    <tr><td><strong>Created</strong></td><td>{{formatTime .Event.CreatedAt}}</td></tr>
+    <tr><td><strong>Updated</strong></td><td>{{formatTime .Event.UpdatedAt}}</td></tr>
+  </table>
+
+  <details open>
+    <summary>Payload</summary>
+    <pre class="payload-pre"><code>{{formatJSON .Event.Payload}}</code></pre>
+  </details>
+
+  {{if or (eq .Event.Status "dead") (eq .Event.Status "failed") (eq .Event.Status "delivered")}}
+  <button hx-post="/dashboard/events/{{.Event.ID}}/replay"
+          hx-target="#toast-container"
+          hx-swap="innerHTML">
+    Replay Event
+  </button>
+  {{end}}
+</article>
+
+<h2>Delivery Attempts</h2>
+{{if .Attempts}}
+<table role="grid">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Endpoint</th>
+      <th>HTTP Status</th>
+      <th>Duration</th>
+      <th>Status</th>
+      <th>Attempted</th>
+      <th>Next Retry</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Attempts}}
+    <tr>
+      <td>{{.AttemptNumber}}</td>
+      <td class="mono">{{.EndpointID}}</td>
+      <td>{{derefInt32 .HttpStatus}}</td>
+      <td>{{derefInt32 .DurationMs}}ms</td>
+      <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
+      <td>{{formatTime .AttemptedAt}}</td>
+      <td>{{formatTime .NextRetryAt}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p style="color: var(--pico-muted-color);">No delivery attempts yet.</p>
+{{end}}
+
+<a href="/dashboard/events">&larr; Back to events</a>
+{{end}}
+
+{{template "layout" .}}

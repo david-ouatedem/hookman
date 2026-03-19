@@ -9,6 +9,7 @@ import (
 
 	"github.com/david-ouatedem/hookman/internal/delivery"
 	"github.com/david-ouatedem/hookman/internal/id"
+	"github.com/david-ouatedem/hookman/internal/metrics"
 	"github.com/david-ouatedem/hookman/internal/store"
 	"github.com/david-ouatedem/hookman/internal/store/queries"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -106,6 +107,8 @@ func (p *Pool) processJob(ctx context.Context, workerID int, job delivery.Delive
 		return
 	}
 
+	metrics.RecordDeliveryAttempt(status, result.DurationMs)
+
 	// Update event status
 	if result.Success {
 		if err := p.store.UpdateEventStatus(ctx, queries.UpdateEventStatusParams{
@@ -123,6 +126,7 @@ func (p *Pool) processJob(ctx context.Context, workerID int, job delivery.Delive
 		}); err != nil {
 			logger.Error("failed to mark event dead", "error", err)
 		}
+		metrics.RecordDeadLetter()
 		logger.Warn("webhook dead-lettered after max retries",
 			"http_status", result.HTTPStatus,
 			"duration_ms", result.DurationMs,

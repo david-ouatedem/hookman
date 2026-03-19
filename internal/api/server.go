@@ -10,6 +10,7 @@ import (
 	"github.com/david-ouatedem/hookman/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server holds the HTTP server and its dependencies.
@@ -44,6 +45,11 @@ func (s *Server) buildRouter() chi.Router {
 	// Health check (no auth)
 	r.Get("/health", s.handleHealth)
 
+	// Prometheus metrics (no auth, conditionally enabled)
+	if s.cfg.MetricsEnabled {
+		r.Handle("/metrics", promhttp.Handler())
+	}
+
 	// API routes (auth required)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(s.authMiddleware)
@@ -54,12 +60,20 @@ func (s *Server) buildRouter() chi.Router {
 		r.Get("/events/{id}", s.handleGetEvent)
 		r.Post("/events/{id}/replay", s.handleReplayEvent)
 
+		// Dead letter queue
+		r.Get("/events/dead", s.handleListDeadEvents)
+		r.Post("/events/dead/replay", s.handleBulkReplayDeadEvents)
+		r.Delete("/events/dead", s.handlePurgeDeadEvents)
+
 		// Endpoints
 		r.Post("/endpoints", s.handleCreateEndpoint)
 		r.Get("/endpoints", s.handleListEndpoints)
 		r.Patch("/endpoints/{id}", s.handleUpdateEndpoint)
 		r.Delete("/endpoints/{id}", s.handleDeleteEndpoint)
 		r.Get("/endpoints/{id}/deliveries", s.handleEndpointDeliveries)
+
+		// Stats
+		r.Get("/stats", s.handleStats)
 	})
 
 	return r

@@ -28,6 +28,10 @@ type EventStore interface {
 	ListEvents(ctx context.Context, params queries.ListEventsParams) ([]queries.Event, error)
 	UpdateEventStatus(ctx context.Context, params queries.UpdateEventStatusParams) error
 	GetPendingEvents(ctx context.Context, limit int32) ([]queries.Event, error)
+	GetDeadEvents(ctx context.Context, params queries.GetDeadEventsParams) ([]queries.Event, error)
+	CountEventsByStatus(ctx context.Context) ([]queries.CountEventsByStatusRow, error)
+	BulkReplayDeadEvents(ctx context.Context) (int64, error)
+	PurgeDeadEvents(ctx context.Context) (int64, error)
 }
 
 // EndpointStore defines operations on subscriber endpoints.

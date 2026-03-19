@@ -32,3 +32,23 @@ FOR UPDATE SKIP LOCKED;
 SELECT id, topic, payload, idempotency_key, status, created_at, updated_at
 FROM events
 WHERE idempotency_key = $1;
+
+-- name: GetDeadEvents :many
+SELECT id, topic, payload, idempotency_key, status, created_at, updated_at
+FROM events
+WHERE status = 'dead'
+  AND (sqlc.narg('before_id')::text IS NULL OR id < sqlc.narg('before_id'))
+ORDER BY updated_at DESC
+LIMIT sqlc.arg('limit_count');
+
+-- name: CountEventsByStatus :many
+SELECT status, COUNT(*)::bigint AS count
+FROM events
+GROUP BY status;
+
+-- name: BulkReplayDeadEvents :execrows
+UPDATE events SET status = 'pending', updated_at = NOW()
+WHERE status = 'dead';
+
+-- name: PurgeDeadEvents :execrows
+DELETE FROM events WHERE status = 'dead';

@@ -49,6 +49,22 @@ func (s *PostgresStore) GetPendingEvents(ctx context.Context, limit int32) ([]qu
 	return s.q.GetPendingEvents(ctx, limit)
 }
 
+func (s *PostgresStore) GetDeadEvents(ctx context.Context, params queries.GetDeadEventsParams) ([]queries.Event, error) {
+	return s.q.GetDeadEvents(ctx, params)
+}
+
+func (s *PostgresStore) CountEventsByStatus(ctx context.Context) ([]queries.CountEventsByStatusRow, error) {
+	return s.q.CountEventsByStatus(ctx)
+}
+
+func (s *PostgresStore) BulkReplayDeadEvents(ctx context.Context) (int64, error) {
+	return s.q.BulkReplayDeadEvents(ctx)
+}
+
+func (s *PostgresStore) PurgeDeadEvents(ctx context.Context) (int64, error) {
+	return s.q.PurgeDeadEvents(ctx)
+}
+
 // --- EndpointStore ---
 
 func (s *PostgresStore) CreateEndpoint(ctx context.Context, params queries.CreateEndpointParams) error {

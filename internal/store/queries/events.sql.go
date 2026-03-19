@@ -11,6 +11,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkReplayDeadEvents = `-- name: BulkReplayDeadEvents :execrows
+UPDATE events SET status = 'pending', updated_at = NOW()
+WHERE status = 'dead'
+`
+
+func (q *Queries) BulkReplayDeadEvents(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, bulkReplayDeadEvents)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const countEventsByStatus = `-- name: CountEventsByStatus :many
+SELECT status, COUNT(*)::bigint AS count
+FROM events
+GROUP BY status
+`
+
+type CountEventsByStatusRow struct {
+	Status string `json:"status"`
+	Count  int64  `json:"count"`
+}
+
+func (q *Queries) CountEventsByStatus(ctx context.Context) ([]CountEventsByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countEventsByStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountEventsByStatusRow{}
+	for rows.Next() {
+		var i CountEventsByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createEvent = `-- name: CreateEvent :exec
 INSERT INTO events (id, topic, payload, idempotency_key, status, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -33,6 +77,48 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error 
 		arg.Status,
 	)
 	return err
+}
+
+const getDeadEvents = `-- name: GetDeadEvents :many
+SELECT id, topic, payload, idempotency_key, status, created_at, updated_at
+FROM events
+WHERE status = 'dead'
+  AND ($1::text IS NULL OR id < $1)
+ORDER BY updated_at DESC
+LIMIT $2
+`
+
+type GetDeadEventsParams struct {
+	BeforeID   pgtype.Text `json:"before_id"`
+	LimitCount int32       `json:"limit_count"`
+}
+
+func (q *Queries) GetDeadEvents(ctx context.Context, arg GetDeadEventsParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getDeadEvents, arg.BeforeID, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Event{}
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Topic,
+			&i.Payload,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getEvent = `-- name: GetEvent :one
@@ -163,6 +249,18 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]Event
 		return nil, err
 	}
 	return items, nil
+}
+
+const purgeDeadEvents = `-- name: PurgeDeadEvents :execrows
+DELETE FROM events WHERE status = 'dead'
+`
+
+func (q *Queries) PurgeDeadEvents(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeDeadEvents)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateEventStatus = `-- name: UpdateEventStatus :exec

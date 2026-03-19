@@ -184,6 +184,51 @@ func (m *mockStore) GetRetryableAttempts(_ context.Context, _ time.Time, _ int32
 	return nil, nil
 }
 
+func (m *mockStore) GetDeadEvents(_ context.Context, params queries.GetDeadEventsParams) ([]queries.Event, error) {
+	var result []queries.Event
+	for _, evt := range m.events {
+		if evt.Status == "dead" {
+			result = append(result, evt)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockStore) CountEventsByStatus(_ context.Context) ([]queries.CountEventsByStatusRow, error) {
+	counts := make(map[string]int64)
+	for _, evt := range m.events {
+		counts[evt.Status]++
+	}
+	var result []queries.CountEventsByStatusRow
+	for status, count := range counts {
+		result = append(result, queries.CountEventsByStatusRow{Status: status, Count: count})
+	}
+	return result, nil
+}
+
+func (m *mockStore) BulkReplayDeadEvents(_ context.Context) (int64, error) {
+	var count int64
+	for id, evt := range m.events {
+		if evt.Status == "dead" {
+			evt.Status = "pending"
+			m.events[id] = evt
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *mockStore) PurgeDeadEvents(_ context.Context) (int64, error) {
+	var count int64
+	for id, evt := range m.events {
+		if evt.Status == "dead" {
+			delete(m.events, id)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func testServer() (*Server, *mockStore) {
 	ms := newMockStore()
 	cfg := &config.Config{
@@ -408,5 +453,139 @@ func TestReplayEvent(t *testing.T) {
 	// Check it's back to pending
 	if ms.events[resp.ID].Status != "pending" {
 		t.Errorf("expected status 'pending' after replay, got %s", ms.events[resp.ID].Status)
+	}
+}
+
+// --- Dead Letter Tests ---
+
+func TestListDeadEvents(t *testing.T) {
+	srv, ms := testServer()
+
+	// Create events and mark some as dead
+	for _, topic := range []string{"a", "b", "c"} {
+		w := doRequest(srv, "POST", "/api/events", map[string]any{
+			"topic":   topic,
+			"payload": map[string]any{"x": 1},
+		})
+		var resp eventResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if topic != "c" {
+			evt := ms.events[resp.ID]
+			evt.Status = "dead"
+			ms.events[resp.ID] = evt
+		}
+	}
+
+	w := doRequest(srv, "GET", "/api/events/dead", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var events []eventResponse
+	json.NewDecoder(w.Body).Decode(&events)
+	if len(events) != 2 {
+		t.Errorf("expected 2 dead events, got %d", len(events))
+	}
+}
+
+func TestBulkReplayDeadEvents(t *testing.T) {
+	srv, ms := testServer()
+
+	// Create 2 dead events
+	for i := 0; i < 2; i++ {
+		w := doRequest(srv, "POST", "/api/events", map[string]any{
+			"topic":   "test",
+			"payload": map[string]any{"i": i},
+		})
+		var resp eventResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		evt := ms.events[resp.ID]
+		evt.Status = "dead"
+		ms.events[resp.ID] = evt
+	}
+
+	w := doRequest(srv, "POST", "/api/events/dead/replay", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// All should be pending now
+	for _, evt := range ms.events {
+		if evt.Status != "pending" {
+			t.Errorf("expected all events pending after bulk replay, got %s", evt.Status)
+		}
+	}
+}
+
+func TestPurgeDeadEvents(t *testing.T) {
+	srv, ms := testServer()
+
+	// Create 3 events: 2 dead, 1 pending
+	for i := 0; i < 3; i++ {
+		w := doRequest(srv, "POST", "/api/events", map[string]any{
+			"topic":   "test",
+			"payload": map[string]any{"i": i},
+		})
+		var resp eventResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if i < 2 {
+			evt := ms.events[resp.ID]
+			evt.Status = "dead"
+			ms.events[resp.ID] = evt
+		}
+	}
+
+	w := doRequest(srv, "DELETE", "/api/events/dead", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	if len(ms.events) != 1 {
+		t.Errorf("expected 1 event remaining after purge, got %d", len(ms.events))
+	}
+}
+
+// --- Stats Tests ---
+
+func TestStats(t *testing.T) {
+	srv, ms := testServer()
+
+	// Create events with different statuses
+	for _, s := range []struct{ topic, status string }{
+		{"a", "pending"},
+		{"b", "delivered"},
+		{"c", "delivered"},
+		{"d", "dead"},
+	} {
+		w := doRequest(srv, "POST", "/api/events", map[string]any{
+			"topic":   s.topic,
+			"payload": map[string]any{"x": 1},
+		})
+		var resp eventResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		evt := ms.events[resp.ID]
+		evt.Status = s.status
+		ms.events[resp.ID] = evt
+	}
+
+	w := doRequest(srv, "GET", "/api/stats", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var stats map[string]int64
+	json.NewDecoder(w.Body).Decode(&stats)
+
+	if stats["pending"] != 1 {
+		t.Errorf("expected 1 pending, got %d", stats["pending"])
+	}
+	if stats["delivered"] != 2 {
+		t.Errorf("expected 2 delivered, got %d", stats["delivered"])
+	}
+	if stats["dead"] != 1 {
+		t.Errorf("expected 1 dead, got %d", stats["dead"])
+	}
+	if stats["total"] != 4 {
+		t.Errorf("expected total 4, got %d", stats["total"])
 	}
 }

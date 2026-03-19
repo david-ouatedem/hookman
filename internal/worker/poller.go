@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/david-ouatedem/hookman/internal/delivery"
+	"github.com/david-ouatedem/hookman/internal/metrics"
 	"github.com/david-ouatedem/hookman/internal/store"
 )
 
@@ -55,6 +56,8 @@ func (p *Poller) pollPendingEvents(ctx context.Context) {
 		slog.Error("poller: failed to get pending events", "error", err)
 		return
 	}
+
+	metrics.RecordQueueDepth("pending", len(events))
 
 	for _, event := range events {
 		endpoints, err := p.store.GetEndpointsByTopic(ctx, event.Topic)

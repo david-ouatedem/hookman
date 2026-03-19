@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/david-ouatedem/hookman/internal/id"
+	"github.com/david-ouatedem/hookman/internal/metrics"
 	"github.com/david-ouatedem/hookman/internal/store"
 	"github.com/david-ouatedem/hookman/internal/store/queries"
 	"github.com/go-chi/chi/v5"
@@ -97,6 +98,8 @@ func (s *Server) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create event")
 		return
 	}
+
+	metrics.RecordEventCreated(req.Topic)
 
 	writeJSON(w, http.StatusCreated, eventResponse{
 		ID:     eventID,

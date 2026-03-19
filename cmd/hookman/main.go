@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/david-ouatedem/hookman/internal/api"
 	"github.com/david-ouatedem/hookman/internal/config"
@@ -20,7 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var version = "0.1.0"
+var version = "0.4.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -103,15 +104,24 @@ func runServe() {
 	<-sigCh
 	slog.Info("shutting down...")
 
-	cancel() // Stop poller and workers
+	// Signal health/ready endpoints to return 503
+	srv.NotifyShutdown()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.RequestTimeout)
+	// Grace period for load balancers to stop routing
+	time.Sleep(5 * time.Second)
+
+	// Stop poller and workers
+	cancel()
+
+	// Drain in-flight HTTP requests
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("HTTP server shutdown error", "error", err)
 	}
 
+	// Wait for workers to finish current jobs
 	wp.Stop()
 	slog.Info("hookman stopped")
 }

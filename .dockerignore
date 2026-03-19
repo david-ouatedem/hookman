@@ -1,0 +1,12 @@
+.git
+.env*
+docs/
+*.md
+tmp/
+.air.toml
+.vscode/
+.idea/
+deploy/
+bin/
+cover.out
+coverage.html

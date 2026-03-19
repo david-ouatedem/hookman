@@ -1,0 +1,14 @@
+Hookman has been deployed!
+
+1. Get the application URL:
+{{- if eq .Values.service.type "ClusterIP" }}
+  kubectl port-forward svc/{{ include "hookman.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- else if eq .Values.service.type "LoadBalancer" }}
+  kubectl get svc {{ include "hookman.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+{{- end }}
+
+2. Access the dashboard:
+  http://localhost:{{ .Values.service.port }}/dashboard
+
+3. Test the API:
+  curl -H "Authorization: Bearer <your-api-key>" http://localhost:{{ .Values.service.port }}/api/stats

@@ -1,0 +1,56 @@
+replicaCount: 1
+
+image:
+  repository: hookman
+  tag: "0.4.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 4000
+
+# Required — must be provided at install time
+config:
+  databaseURL: ""
+  apiKey: ""
+  signingSecret: ""
+
+  # Optional with defaults
+  port: 4000
+  workerConcurrency: 20
+  maxRetries: 5
+  requestTimeout: "10s"
+  pollInterval: "1s"
+  metricsEnabled: true
+  logLevel: "info"
+  dashboardEnabled: true
+  shutdownTimeout: "30s"
+  rateLimitRPS: 100
+  rateLimitBurst: 200
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+migration:
+  enabled: true

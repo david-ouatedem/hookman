@@ -12,7 +12,7 @@ test:
 	go test ./... -count=1 -short
 
 test-integration:
-	go test ./... -count=1 -run Integration
+	go test ./... -count=1 -tags=integration
 
 lint:
 	golangci-lint run ./...

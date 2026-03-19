@@ -16,17 +16,19 @@ import (
 
 // Server holds the HTTP server and its dependencies.
 type Server struct {
-	cfg    *config.Config
-	store  store.Store
-	router chi.Router
-	http   *http.Server
+	cfg        *config.Config
+	store      store.Store
+	router     chi.Router
+	http       *http.Server
+	shutdownCh chan struct{}
 }
 
 // NewServer creates a new API server.
 func NewServer(cfg *config.Config, s store.Store) *Server {
 	srv := &Server{
-		cfg:   cfg,
-		store: s,
+		cfg:        cfg,
+		store:      s,
+		shutdownCh: make(chan struct{}),
 	}
 	srv.router = srv.buildRouter()
 	srv.http = &http.Server{
@@ -45,6 +47,7 @@ func (s *Server) buildRouter() chi.Router {
 
 	// Health check (no auth)
 	r.Get("/health", s.handleHealth)
+	r.Get("/ready", s.handleHealth)
 
 	// Prometheus metrics (no auth, conditionally enabled)
 	if s.cfg.MetricsEnabled {
@@ -59,6 +62,9 @@ func (s *Server) buildRouter() chi.Router {
 
 	// API routes (auth required)
 	r.Route("/api", func(r chi.Router) {
+		if s.cfg.RateLimitRPS > 0 {
+			r.Use(s.rateLimitMiddleware())
+		}
 		r.Use(s.authMiddleware)
 
 		// Events
@@ -95,4 +101,19 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the HTTP server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
+}
+
+// NotifyShutdown signals that the server is shutting down.
+// Health and readiness endpoints will start returning 503.
+func (s *Server) NotifyShutdown() {
+	close(s.shutdownCh)
+}
+
+func (s *Server) isShuttingDown() bool {
+	select {
+	case <-s.shutdownCh:
+		return true
+	default:
+		return false
+	}
 }

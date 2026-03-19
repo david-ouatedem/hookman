@@ -589,3 +589,93 @@ func TestStats(t *testing.T) {
 		t.Errorf("expected total 4, got %d", stats["total"])
 	}
 }
+
+// --- Ready Endpoint Tests ---
+
+func TestReadyEndpoint(t *testing.T) {
+	srv, _ := testServer()
+	req := httptest.NewRequest("GET", "/ready", nil)
+	w := httptest.NewRecorder()
+	srv.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHealthDuringShutdown(t *testing.T) {
+	srv, _ := testServer()
+	srv.NotifyShutdown()
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+	srv.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+
+	var resp map[string]string
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["status"] != "shutting_down" {
+		t.Errorf("expected shutting_down, got %s", resp["status"])
+	}
+}
+
+func TestReadyDuringShutdown(t *testing.T) {
+	srv, _ := testServer()
+	srv.NotifyShutdown()
+
+	req := httptest.NewRequest("GET", "/ready", nil)
+	w := httptest.NewRecorder()
+	srv.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+// --- Rate Limiting Tests ---
+
+func TestRateLimiting(t *testing.T) {
+	ms := newMockStore()
+	cfg := &config.Config{
+		APIKey:        "test-api-key",
+		SigningSecret: "test-secret",
+		Port:          4000,
+		RateLimitRPS:  5,
+		RateLimitBurst: 5,
+	}
+	srv := NewServer(cfg, ms)
+
+	got429 := false
+	for i := 0; i < 20; i++ {
+		w := doRequest(srv, "GET", "/api/events", nil)
+		if w.Code == http.StatusTooManyRequests {
+			got429 = true
+			break
+		}
+	}
+	if !got429 {
+		t.Error("expected rate limiting to return 429")
+	}
+}
+
+func TestRateLimitingDisabled(t *testing.T) {
+	ms := newMockStore()
+	cfg := &config.Config{
+		APIKey:        "test-api-key",
+		SigningSecret: "test-secret",
+		Port:          4000,
+		RateLimitRPS:  0,
+	}
+	srv := NewServer(cfg, ms)
+
+	for i := 0; i < 20; i++ {
+		w := doRequest(srv, "GET", "/api/events", nil)
+		if w.Code == http.StatusTooManyRequests {
+			t.Error("rate limiting should be disabled when RateLimitRPS=0")
+			break
+		}
+	}
+}

@@ -20,6 +20,9 @@ type Config struct {
 	MetricsEnabled    bool
 	LogLevel          string
 	DashboardEnabled  bool
+	ShutdownTimeout   time.Duration
+	RateLimitRPS      int
+	RateLimitBurst    int
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -36,6 +39,9 @@ func Load() (*Config, error) {
 		MetricsEnabled:    getEnvBool("METRICS_ENABLED", false),
 		LogLevel:          getEnvString("LOG_LEVEL", "info"),
 		DashboardEnabled:  getEnvBool("DASHBOARD_ENABLED", true),
+		ShutdownTimeout:   getEnvDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
+		RateLimitRPS:      getEnvInt("RATE_LIMIT_RPS", 100),
+		RateLimitBurst:    getEnvInt("RATE_LIMIT_BURST", 200),
 	}
 
 	if cfg.DatabaseURL == "" {
